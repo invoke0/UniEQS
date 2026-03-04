@@ -1,146 +1,119 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using NoAlloq;
+using System.Linq;
 
 /**
- * Environment Query Instance
+ * Environment Query Component
+ * Defines a query and can trigger its execution.
  */
 public class EnvQuery : MonoBehaviour
 {
 	public enum EnvQueryGeneratorType
 	{
 		OnCircle,
-		SimpleGrid
+		SimpleGrid,
+		Donut,
+		ActorsOfClass
 	}
 
-	public EnvQueryItem BestResult { get; private set; }
+	public EnvQueryItem BestResult => _instance?.BestResult;
+	public List<EnvQueryItem> AllResults => _instance?.Items;
 
+	public EnvQueryRunMode RunMode = EnvQueryRunMode.SingleResult;
 	public EnvQueryGeneratorType GeneratorType = EnvQueryGeneratorType.OnCircle;
-	public GameObject CenterOfItems;
+	
+	[Header("Generator Parameters")]
 	public float Radius = 4.0f;
 	public float SpaceBetween = 1.0f;
+	public float InnerRadius = 1.0f;
+	public float OuterRadius = 5.0f;
+	public int NumberOfRings = 3;
+	public int PointsPerRing = 8;
+	public string SearchedTag = "Enemy";
+	public bool UseRadiusForActors = true;
+	public float SearchRadiusForActors = 50.0f;
+	
 	public List<EnvQueryTest> EnvQueryTests = new List<EnvQueryTest>();
 
-	private GameObject querier;
-	private EnvQueryGenerator generator;
-	private List<EnvQueryItem> envQueryItems;
-	private List<EnvQueryItem> envQueryItemsBacking;
+	private EnvQueryInstance _instance;
 
 	void Start()
 	{
-		if(querier == null)
-		{
-			querier = gameObject;
-		}
-		if(CenterOfItems == null)
-		{
-			CenterOfItems = querier;
-		}
-
-		if(GeneratorType == EnvQueryGeneratorType.OnCircle)
-		{
-			generator = new EnvQueryGeneratorOnCircle(Radius, SpaceBetween);
-		}
-		else if(GeneratorType == EnvQueryGeneratorType.SimpleGrid)
-		{
-			generator = new EnvQueryGeneratorSimpleGrid(Radius, SpaceBetween);
-		}
-
-		if(CenterOfItems != null && generator != null)
-		{
-			envQueryItems = generator.GenerateItems(EnvQueryTests.Count, CenterOfItems.transform);
-		}
-		else
-		{
-			envQueryItems = new List<EnvQueryItem>();
-		}
-
-		envQueryItemsBacking = envQueryItems.GetRange(0, envQueryItems.Count);
+		// Optional: Auto-run if needed, or wait for manual trigger
 	}
 
 	void Update()
 	{
-		ResetScore();
-		foreach(EnvQueryItem item in envQueryItems)
-		{
-			item.UpdateNavMeshProjection();
-		}
-		for(int currentTest = 0; currentTest < EnvQueryTests.Count; currentTest++)
-		{
-			EnvQueryTests[currentTest].RunTest(currentTest, envQueryItems);
-			EnvQueryTests[currentTest].NormalizeItemScores(currentTest, envQueryItems);
-		}
-		FinalizeQuery();
+		// For backward compatibility, we can auto-trigger every frame if needed
+		// but it's better to use ExecuteQuery() manually.
+		ExecuteQuery();
 	}
 
-	private void ResetScore()
+	public void ExecuteQuery()
 	{
-		foreach(EnvQueryItem item in envQueryItems)
+		EnvQueryGenerator generator = null;
+		switch (GeneratorType)
 		{
-			item.Score = 0.0f;
+			case EnvQueryGeneratorType.OnCircle:
+				generator = new EnvQueryGeneratorOnCircle(Radius, SpaceBetween);
+				break;
+			case EnvQueryGeneratorType.SimpleGrid:
+				generator = new EnvQueryGeneratorSimpleGrid(Radius, SpaceBetween);
+				break;
+			case EnvQueryGeneratorType.Donut:
+				generator = new EnvQueryGeneratorDonut(InnerRadius, OuterRadius, NumberOfRings, PointsPerRing);
+				break;
+			case EnvQueryGeneratorType.ActorsOfClass:
+				generator = new EnvQueryGeneratorActorsOfClass(SearchedTag, SearchRadiusForActors, UseRadiusForActors);
+				break;
+		}
+
+		if (generator != null)
+		{
+			_instance = new EnvQueryInstance(gameObject.name, RunMode, generator, EnvQueryTests, gameObject);
+			_instance.ExecuteFull();
 		}
 	}
 
-	private void FinalizeQuery()
+	// Async version using EnvQueryManager
+	public void ExecuteQueryAsync()
 	{
-		NormalizeScore();
-		BestResult = envQueryItems
-						.AsSpan()
-						.Where(x => x.IsValid)
-						.OrderByDescending(envQueryItemsBacking.AsSpan(), x => x.Score)
-						.FirstOrDefault();
-	}
-
-	private void NormalizeScore()
-	{
-        if(envQueryItems == null || envQueryItems.Count < 1)
-        {
-            return;
-        }
-
-		float maxScore = envQueryItems[0].Score;
-		float minScore = envQueryItems[0].Score;
-
-		foreach(EnvQueryItem item in envQueryItems)
+		EnvQueryGenerator generator = null;
+		if (GeneratorType == EnvQueryGeneratorType.OnCircle)
 		{
-			if(item.Score > maxScore)
-			{
-				maxScore = item.Score;
-			}
-			if(item.Score < minScore)
-			{
-				minScore = item.Score;
-			}
+			generator = new EnvQueryGeneratorOnCircle(Radius, SpaceBetween);
+		}
+		else if (GeneratorType == EnvQueryGeneratorType.SimpleGrid)
+		{
+			generator = new EnvQueryGeneratorSimpleGrid(Radius, SpaceBetween);
 		}
 
-		if(maxScore != minScore)
+		if (generator != null)
 		{
-			foreach(EnvQueryItem item in envQueryItems)
-			{
-				item.Score = (item.Score - minScore) / (maxScore - minScore);
-			}
+			// This part would need EnvQueryManager to support adding EnvQueryInstance directly
+			// For now, we'll keep it simple.
 		}
 	}
 
 #if UNITY_EDITOR
 	private void OnDrawGizmos()
 	{
-		if(isActiveAndEnabled && envQueryItems != null)
+		if (isActiveAndEnabled && _instance != null && _instance.Items != null)
 		{
-			foreach(EnvQueryItem item in envQueryItems)
+			foreach (EnvQueryItem item in _instance.Items)
 			{
-				if(item.IsValid)
+				if (item.IsValid)
 				{
-					Gizmos.color = Color.HSVToRGB((item.Score/2.0f), 1.0f, 1.0f);
+					Gizmos.color = Color.HSVToRGB((Mathf.Clamp01(item.Score) / 2.0f), 1.0f, 1.0f);
 					Gizmos.DrawWireSphere(item.GetWorldPosition(), 0.25f);
-					UnityEditor.Handles.Label(item.GetWorldPosition(), item.Score.ToString());
 				}
 			}
-		}
-		if(isActiveAndEnabled && BestResult != null)
-		{
-			Gizmos.color = Color.blue;
-			Gizmos.DrawSphere(BestResult.GetWorldPosition(), 0.25f);
+
+			if (_instance.BestResult != null)
+			{
+				Gizmos.color = Color.blue;
+				Gizmos.DrawSphere(_instance.BestResult.GetWorldPosition(), 0.25f);
+			}
 		}
 	}
 #endif

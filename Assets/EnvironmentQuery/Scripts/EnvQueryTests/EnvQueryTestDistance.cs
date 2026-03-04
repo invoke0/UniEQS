@@ -3,23 +3,24 @@ using UnityEngine;
 
 public class EnvQueryTestDistance : EnvQueryTest
 {
-    public Transform DistanceTo;
+    public EnvQueryContext DistanceTo;
 
-    public override void RunTest(int currentTest, List<EnvQueryItem> envQueryItems)
+    public override void RunTest(EnvQueryInstance queryInstance, int currentTest)
     {
-        if(IsActive && DistanceTo != null && envQueryItems != null)
+        if (!IsActive || DistanceTo == null || queryInstance.Items == null) return;
+
+        List<Vector3> contextLocations;
+        DistanceTo.ProvideContext(queryInstance, out contextLocations);
+
+        if (contextLocations.Count == 0) return;
+
+        foreach (EnvQueryItem item in queryInstance.Items)
         {
-            foreach(EnvQueryItem item in envQueryItems)
-            {
-                item.TestResults[currentTest] = Vector3.Distance(DistanceTo.position, item.GetWorldPosition());
-            }
-        }
-        else
-        {
-            foreach(EnvQueryItem item in envQueryItems)
-            {
-                item.TestResults[currentTest] = 0.0f;
-            }
+            if (!item.IsValid) continue;
+
+            float distance = Vector3.Distance(contextLocations[0], item.GetWorldPosition());
+            item.TestResults[currentTest] = distance;
+            FilterItem(item, distance);
         }
     }
 }

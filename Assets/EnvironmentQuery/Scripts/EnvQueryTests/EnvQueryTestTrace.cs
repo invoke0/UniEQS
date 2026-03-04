@@ -9,58 +9,46 @@ public class EnvQueryTestTrace : EnvQueryTest
         Invisible
     }
 
-    // [SerializeField]
-    // private GameObject querier;
-
     [SerializeField]
-    private TraceType traceType;
+    private TraceType traceType = TraceType.Visible;
 
-    public Transform TraceFrom; // TraceFrom
+    public EnvQueryContext TraceFrom;
 
     public float ItemHeightOffset;
     public float TargetHeightOffset;
 
-    public EnvQueryTestTrace()
+    public override void RunTest(EnvQueryInstance queryInstance, int currentTest)
     {
-        traceType = TraceType.Visible;
-    }
+        if (!IsActive || TraceFrom == null || queryInstance.Items == null) return;
 
-    public override void RunTest(int currentTest, List<EnvQueryItem> envQueryItems)
-    {
-        if(IsActive && TraceFrom != null && envQueryItems != null)
+        List<Vector3> contextLocations;
+        TraceFrom.ProvideContext(queryInstance, out contextLocations);
+        if (contextLocations.Count == 0) return;
+
+        Vector3 fromPos = contextLocations[0] + Vector3.up * TargetHeightOffset;
+
+        foreach (EnvQueryItem item in queryInstance.Items)
         {
-            foreach(EnvQueryItem item in envQueryItems)
-            {
-                Vector3 itemPosition = item.GetWorldPosition() + Vector3.up * ItemHeightOffset;
-                // Vector3 direction =  itemPosition - TraceFrom.position;
-                Vector3 direction = (TraceFrom.position + Vector3.up * TargetHeightOffset) - itemPosition;
+            if (!item.IsValid) continue;
 
-                RaycastHit raycastHit;
-                Physics.Raycast(itemPosition, direction, out raycastHit);
-                // Physics.Raycast(TraceFrom.position, direction, out raycastHit);
+            Vector3 itemPosition = item.GetWorldPosition() + Vector3.up * ItemHeightOffset;
+            Vector3 direction = fromPos - itemPosition;
+            float distance = direction.magnitude;
 
-                if(raycastHit.transform == TraceFrom)
-                {
-                    if(traceType == TraceType.Visible)
-                    {
-                        item.TestResults[currentTest] = 1.0f;
-                    }
-                    else if(traceType == TraceType.Invisible)
-                    {
-                        item.TestResults[currentTest] = -1.0f;
-                    }
-                }
-                else{
-                    item.TestResults[currentTest] = 0.0f;
-                }
-            }
-        }
-        else
-        {
-            foreach(EnvQueryItem item in envQueryItems)
+            bool hit = Physics.Raycast(itemPosition, direction.normalized, out RaycastHit raycastHit, distance);
+
+            float result = 0.0f;
+            if (!hit) // Visible
             {
-                item.TestResults[currentTest] = 0.0f;
+                result = (traceType == TraceType.Visible) ? 1.0f : 0.0f;
             }
+            else
+            {
+                result = (traceType == TraceType.Invisible) ? 1.0f : 0.0f;
+            }
+
+            item.TestResults[currentTest] = result;
+            FilterItem(item, result);
         }
     }
 }

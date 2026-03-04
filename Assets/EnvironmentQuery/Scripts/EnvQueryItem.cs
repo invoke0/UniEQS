@@ -7,24 +7,34 @@ public class EnvQueryItem
     public float Score;
     public bool IsValid;
     public float[] TestResults;
+    public GameObject Actor; // Store associated actor if this item is an actor
 
-    private Transform centerOfItems; // 基準位置
-    private Vector3 location; // 相対位置
-    private Vector3 navLocation; // 相対位置（NavMesh投影後）
+    private Transform centerOfItems; // Base position
+    private Vector3 location; // Relative location
+    private Vector3 navLocation; // Relative location (after NavMesh projection)
 
-    public EnvQueryItem(int numTests, Vector3 location, Transform centerOfItems)
+    public EnvQueryItem(int numTests, Vector3 location, Transform centerOfItems, GameObject actor = null)
     {
         Score = 0.0f;
         IsValid = true;
         TestResults = new float[numTests];
+        for (int i = 0; i < numTests; i++) TestResults[i] = EnvQueryTypes.SkippedItemValue;
         this.centerOfItems = centerOfItems;
         this.location = location;
         this.navLocation = location;
+        this.Actor = actor;
     }
 
     public Vector3 GetWorldPosition()
     {
+        if (Actor != null) return Actor.transform.position;
         return centerOfItems.position + navLocation;
+    }
+
+    public void Discard()
+    {
+        IsValid = false;
+        Score = -float.MaxValue;
     }
 
     public void UpdateNavMeshProjection()
@@ -33,15 +43,21 @@ public class EnvQueryItem
 
         NavMeshHit result;
         Vector3 worldPosition = centerOfItems.position + location;
-        NavMesh.SamplePosition(worldPosition, out result, 3.0f, NavMesh.AllAreas);
-
-        float diff = (result.position.x - worldPosition.x)*(result.position.x - worldPosition.x)
-                   + (result.position.z - worldPosition.z)*(result.position.z - worldPosition.z);
-
-        if(result.hit && diff < 0.00000001f)
+        if (NavMesh.SamplePosition(worldPosition, out result, 3.0f, NavMesh.AllAreas))
         {
-            IsValid = true;
-            navLocation = result.position - centerOfItems.position;
+            float diff = (result.position.x - worldPosition.x)*(result.position.x - worldPosition.x)
+                       + (result.position.z - worldPosition.z)*(result.position.z - worldPosition.z);
+
+            if(diff < 0.0001f) // Loosened the precision requirement slightly
+            {
+                IsValid = true;
+                navLocation = result.position - centerOfItems.position;
+            }
+            else
+            {
+                IsValid = false;
+                navLocation = location;
+            }
         }
         else
         {
