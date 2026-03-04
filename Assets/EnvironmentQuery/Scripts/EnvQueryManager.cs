@@ -31,7 +31,8 @@ public class EnvQueryManager : MonoBehaviour
     [Tooltip("Maximum allowed time per frame for executing queries (in seconds).")]
     public float MaxAllowedTestingTime = 0.01f;
 
-    private List<EnvQuery> _runningQueries = new List<EnvQuery>();
+    private List<EnvQueryInstance> _runningQueries = new List<EnvQueryInstance>();
+    private int _nextQueryID = 0;
 
     void Update()
     {
@@ -48,38 +49,41 @@ public class EnvQueryManager : MonoBehaviour
         while (timeLeft > 0.0f && index < _runningQueries.Count)
         {
             float stepStartTime = Time.realtimeSinceStartup;
-            EnvQuery query = _runningQueries[index];
+            EnvQueryInstance instance = _runningQueries[index];
 
-            if (query == null || !query.isActiveAndEnabled)
+            if (instance == null || instance.Owner == null)
             {
                 _runningQueries.RemoveAt(index);
                 continue;
             }
 
-            // In UE5, ExecuteOneStep handles the progression. 
-            // Here, we can call ExecuteQuery and track how long it took.
-            // If we want real time-slicing, we'd need to modify EnvQuery to support partial execution.
-            query.ExecuteQuery();
+            instance.ExecuteOneStep(timeLeft);
+
+            if (instance.IsFinished())
+            {
+                _runningQueries.RemoveAt(index);
+            }
+            else
+            {
+                index++;
+            }
 
             float stepDuration = Time.realtimeSinceStartup - stepStartTime;
             timeLeft -= stepDuration;
-
-            // In this simplified version, we just remove it once it's done. 
-            // In UE5, queries might take multiple frames.
-            _runningQueries.RemoveAt(index);
         }
     }
 
-    public void RunQuery(EnvQuery query)
+    public int RunQuery(EnvQueryInstance instance, QueryFinishedSignature callback)
     {
-        if (!_runningQueries.Contains(query))
-        {
-            _runningQueries.Add(query);
-        }
+        instance.OnQueryFinished = callback;
+        _runningQueries.Add(instance);
+        return instance.QueryID;
     }
 
-    public void AbortQuery(EnvQuery query)
+    public int GetNextQueryID() => _nextQueryID++;
+
+    public void AbortQuery(int requestID)
     {
-        _runningQueries.Remove(query);
+        _runningQueries.RemoveAll(q => q.QueryID == requestID);
     }
 }

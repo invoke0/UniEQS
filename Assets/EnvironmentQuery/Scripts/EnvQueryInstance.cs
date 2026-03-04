@@ -18,8 +18,11 @@ public class EnvQueryInstance
     }
 
     public string QueryName;
+    public int QueryID;
     public Status CurrentStatus = Status.Processing;
     public EnvQueryRunMode RunMode;
+    public QueryFinishedSignature OnQueryFinished;
+    public Dictionary<string, float> NamedParams = new Dictionary<string, float>();
     public List<EnvQueryItem> Items = new List<EnvQueryItem>();
     public EnvQueryItem BestResult { get; private set; }
     public float TotalExecutionTime { get; private set; }
@@ -31,9 +34,10 @@ public class EnvQueryInstance
     private int currentTestIndex = -1; // -1 means generation step
     private bool isFinished = false;
 
-    public EnvQueryInstance(string name, EnvQueryRunMode mode, EnvQueryGenerator gen, List<EnvQueryTest> queryTests, GameObject owner)
+    public EnvQueryInstance(string name, int id, EnvQueryRunMode mode, EnvQueryGenerator gen, List<EnvQueryTest> queryTests, GameObject owner)
     {
         QueryName = name;
+        QueryID = id;
         RunMode = mode;
         generator = gen;
         tests = queryTests;
@@ -122,6 +126,9 @@ public class EnvQueryInstance
         }
 
         CurrentStatus = Status.Success;
+
+        // Notify delegate if set
+        OnQueryFinished?.Invoke(this);
     }
 
     private EnvQueryItem PickRandomItemOfScoreAtLeast(List<EnvQueryItem> sortedValidItems, float minScore)

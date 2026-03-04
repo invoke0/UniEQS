@@ -16,83 +16,43 @@ public class EnvQuery : MonoBehaviour
 		ActorsOfClass
 	}
 
+	public EnvQueryTemplate QueryTemplate; // Template asset
+	public EnvQueryRunMode RunMode = EnvQueryRunMode.SingleResult;
+
 	public EnvQueryItem BestResult => _instance?.BestResult;
 	public List<EnvQueryItem> AllResults => _instance?.Items;
 
-	public EnvQueryRunMode RunMode = EnvQueryRunMode.SingleResult;
-	public EnvQueryGeneratorType GeneratorType = EnvQueryGeneratorType.OnCircle;
-	
-	[Header("Generator Parameters")]
-	public float Radius = 4.0f;
-	public float SpaceBetween = 1.0f;
-	public float InnerRadius = 1.0f;
-	public float OuterRadius = 5.0f;
-	public int NumberOfRings = 3;
-	public int PointsPerRing = 8;
-	public string SearchedTag = "Enemy";
-	public bool UseRadiusForActors = true;
-	public float SearchRadiusForActors = 50.0f;
-	
-	public List<EnvQueryTest> EnvQueryTests = new List<EnvQueryTest>();
-
 	private EnvQueryInstance _instance;
+	private int _requestID = EnvQueryTypes.INDEX_NONE;
 
 	void Start()
 	{
-		// Optional: Auto-run if needed, or wait for manual trigger
+		// Manual execution example
+		// ExecuteQuery();
 	}
 
 	void Update()
 	{
-		// For backward compatibility, we can auto-trigger every frame if needed
-		// but it's better to use ExecuteQuery() manually.
+		// For backward compatibility or testing, can be called per frame
+		// though real use should be event-driven or from AI behavior nodes.
 		ExecuteQuery();
 	}
 
 	public void ExecuteQuery()
 	{
-		EnvQueryGenerator generator = null;
-		switch (GeneratorType)
-		{
-			case EnvQueryGeneratorType.OnCircle:
-				generator = new EnvQueryGeneratorOnCircle(Radius, SpaceBetween);
-				break;
-			case EnvQueryGeneratorType.SimpleGrid:
-				generator = new EnvQueryGeneratorSimpleGrid(Radius, SpaceBetween);
-				break;
-			case EnvQueryGeneratorType.Donut:
-				generator = new EnvQueryGeneratorDonut(InnerRadius, OuterRadius, NumberOfRings, PointsPerRing);
-				break;
-			case EnvQueryGeneratorType.ActorsOfClass:
-				generator = new EnvQueryGeneratorActorsOfClass(SearchedTag, SearchRadiusForActors, UseRadiusForActors);
-				break;
-		}
+		if (QueryTemplate == null) return;
 
-		if (generator != null)
-		{
-			_instance = new EnvQueryInstance(gameObject.name, RunMode, generator, EnvQueryTests, gameObject);
-			_instance.ExecuteFull();
-		}
+		// 1. Create a request (similar to UE5 code)
+		EnvQueryRequest request = new EnvQueryRequest(QueryTemplate, gameObject);
+
+		// 2. Execute and store ID (like MyMemory->RequestID = EQSRequest.Execute...)
+		_requestID = request.Execute(RunMode, OnQueryFinished);
 	}
 
-	// Async version using EnvQueryManager
-	public void ExecuteQueryAsync()
+	private void OnQueryFinished(EnvQueryInstance instance)
 	{
-		EnvQueryGenerator generator = null;
-		if (GeneratorType == EnvQueryGeneratorType.OnCircle)
-		{
-			generator = new EnvQueryGeneratorOnCircle(Radius, SpaceBetween);
-		}
-		else if (GeneratorType == EnvQueryGeneratorType.SimpleGrid)
-		{
-			generator = new EnvQueryGeneratorSimpleGrid(Radius, SpaceBetween);
-		}
-
-		if (generator != null)
-		{
-			// This part would need EnvQueryManager to support adding EnvQueryInstance directly
-			// For now, we'll keep it simple.
-		}
+		_instance = instance;
+		// Handle result (e.g., move AI or update blackboard)
 	}
 
 #if UNITY_EDITOR

@@ -55,8 +55,11 @@ public enum EnvQueryStatus
     MissingTemplate
 }
 
+public delegate void QueryFinishedSignature(EnvQueryInstance queryInstance);
+
 public static class EnvQueryTypes
 {
+    public const int INDEX_NONE = -1;
     public const float SkippedItemValue = -float.MaxValue;
     public const float UnlimitedStepTime = -1.0f;
 }
