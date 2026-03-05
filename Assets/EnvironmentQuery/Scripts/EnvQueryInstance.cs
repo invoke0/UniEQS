@@ -28,21 +28,18 @@ public class EnvQueryInstance
     public float TotalExecutionTime { get; private set; }
     public GameObject Owner { get; private set; }
 
-    private List<EnvQueryTest> tests;
-    private EnvQueryGenerator generator;
-    private Transform centerOfItems;
+    private List<EnvQueryOption> options;
+    private int currentOptionIndex = 0;
     private int currentTestIndex = -1; // -1 means generation step
     private bool isFinished = false;
 
-    public EnvQueryInstance(string name, int id, EnvQueryRunMode mode, EnvQueryGenerator gen, List<EnvQueryTest> queryTests, GameObject owner)
+    public EnvQueryInstance(string name, int id, EnvQueryRunMode mode, List<EnvQueryOption> queryOptions, GameObject owner)
     {
         QueryName = name;
         QueryID = id;
         RunMode = mode;
-        generator = gen;
-        tests = queryTests;
+        options = queryOptions;
         Owner = owner;
-        centerOfItems = owner.transform;
     }
 
     public bool IsFinished() => isFinished;
@@ -53,12 +50,21 @@ public class EnvQueryInstance
 
         float startTime = Time.realtimeSinceStartup;
 
+        if (options == null || options.Count == 0)
+        {
+            CurrentStatus = Status.Failed;
+            isFinished = true;
+            return;
+        }
+
+        EnvQueryOption currentOption = options[currentOptionIndex];
+
         if (currentTestIndex == -1)
         {
             // Generation step
-            if (generator != null && centerOfItems != null)
+            if (currentOption.Generator != null && Owner != null)
             {
-                Items = generator.GenerateItems(tests.Count, centerOfItems);
+                Items = currentOption.Generator.GenerateItems(currentOption.Tests.Count, Owner.transform);
                 foreach (var item in Items)
                 {
                     item.UpdateNavMeshProjection();
@@ -66,10 +72,10 @@ public class EnvQueryInstance
             }
             currentTestIndex = 0;
         }
-        else if (currentTestIndex < tests.Count)
+        else if (currentTestIndex < currentOption.Tests.Count)
         {
             // Test step
-            EnvQueryTest test = tests[currentTestIndex];
+            EnvQueryTest test = currentOption.Tests[currentTestIndex];
             if (test != null && test.IsActive)
             {
                 test.RunTest(this, currentTestIndex);
@@ -78,12 +84,39 @@ public class EnvQueryInstance
             currentTestIndex++;
         }
 
-        if (currentTestIndex >= tests.Count)
+        // Check if current option is finished
+        if (currentTestIndex >= currentOption.Tests.Count)
         {
-            FinalizeQuery();
+            FinalizeOption();
         }
 
         TotalExecutionTime += (Time.realtimeSinceStartup - startTime);
+    }
+
+    private void FinalizeOption()
+    {
+        var validItems = Items.Where(x => x.IsValid).ToList();
+        
+        if (validItems.Count > 0)
+        {
+            // Found results in current option, finalize query
+            FinalizeQuery(validItems);
+        }
+        else
+        {
+            // No results in current option, try next option
+            currentOptionIndex++;
+            currentTestIndex = -1;
+            
+            if (currentOptionIndex >= options.Count)
+            {
+                // All options failed
+                CurrentStatus = Status.Failed;
+                BestResult = null;
+                isFinished = true;
+                OnQueryFinished?.Invoke(this);
+            }
+        }
     }
 
     public void ExecuteFull()
@@ -94,18 +127,10 @@ public class EnvQueryInstance
         }
     }
 
-    private void FinalizeQuery()
+    private void FinalizeQuery(List<EnvQueryItem> validItems)
     {
         isFinished = true;
         
-        var validItems = Items.Where(x => x.IsValid).ToList();
-        if (validItems.Count == 0)
-        {
-            CurrentStatus = Status.Failed;
-            BestResult = null;
-            return;
-        }
-
         // Sort by score
         validItems.Sort((a, b) => b.Score.CompareTo(a.Score));
 
@@ -126,8 +151,6 @@ public class EnvQueryInstance
         }
 
         CurrentStatus = Status.Success;
-
-        // Notify delegate if set
         OnQueryFinished?.Invoke(this);
     }
 

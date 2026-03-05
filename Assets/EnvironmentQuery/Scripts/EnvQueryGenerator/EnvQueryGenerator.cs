@@ -1,8 +1,11 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public interface EnvQueryGenerator
+/**
+ * Environment Query Generator (Definition)
+ * Base class for all generators, similar to UEnvQueryGenerator in UE5.
+ */
+public abstract class EnvQueryGenerator : ScriptableObject
 {
-    List<EnvQueryItem> GenerateItems(int numTests, Transform centerOfItems);
+    public abstract List<EnvQueryItem> GenerateItems(int numTests, Transform centerOfItems);
 }

@@ -32,44 +32,16 @@ public class EnvQueryRequest
             return EnvQueryTypes.INDEX_NONE;
         }
 
-        // 1. Resolve Generator
-        EnvQueryGenerator generator = null;
-        switch (QueryTemplate.GeneratorType)
-        {
-            case EnvQuery.EnvQueryGeneratorType.OnCircle:
-                generator = new EnvQueryGeneratorOnCircle(QueryTemplate.Radius, QueryTemplate.SpaceBetween);
-                break;
-            case EnvQuery.EnvQueryGeneratorType.SimpleGrid:
-                generator = new EnvQueryGeneratorSimpleGrid(QueryTemplate.Radius, QueryTemplate.SpaceBetween);
-                break;
-            case EnvQuery.EnvQueryGeneratorType.Donut:
-                generator = new EnvQueryGeneratorDonut(QueryTemplate.InnerRadius, QueryTemplate.OuterRadius, QueryTemplate.NumberOfRings, QueryTemplate.PointsPerRing);
-                break;
-            case EnvQuery.EnvQueryGeneratorType.ActorsOfClass:
-                generator = new EnvQueryGeneratorActorsOfClass(QueryTemplate.SearchedTag, QueryTemplate.SearchRadiusForActors, QueryTemplate.UseRadiusForActors);
-                break;
-        }
+        // 1. Create Query Instance via Manager
+        EnvQueryInstance instance = EnvQueryManager.Instance.CreateQueryInstance(QueryTemplate, runMode, Owner);
 
-        if (generator == null) return EnvQueryTypes.INDEX_NONE;
-
-        // 2. Create Query Instance
-        int queryID = EnvQueryManager.Instance.GetNextQueryID();
-        EnvQueryInstance instance = new EnvQueryInstance(
-            QueryTemplate.QueryName,
-            queryID,
-            runMode,
-            generator,
-            new List<EnvQueryTest>(QueryTemplate.EnvQueryTests), // Copy tests to instance
-            Owner
-        );
-
-        // 3. Set Named Params
+        // 2. Set Named Params
         foreach (var param in NamedParams)
         {
             instance.NamedParams[param.Key] = param.Value;
         }
 
-        // 4. Register and Run in Manager
+        // 3. Register and Run in Manager
         return EnvQueryManager.Instance.RunQuery(instance, callback);
     }
 }

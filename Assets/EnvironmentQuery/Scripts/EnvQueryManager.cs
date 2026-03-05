@@ -80,6 +80,17 @@ public class EnvQueryManager : MonoBehaviour
         return instance.QueryID;
     }
 
+    public EnvQueryInstance CreateQueryInstance(EnvQueryTemplate template, EnvQueryRunMode runMode, GameObject owner)
+    {
+        return new EnvQueryInstance(
+            template.QueryName,
+            GetNextQueryID(),
+            runMode,
+            new List<EnvQueryOption>(template.Options),
+            owner
+        );
+    }
+
     public int GetNextQueryID() => _nextQueryID++;
 
     public void AbortQuery(int requestID)
