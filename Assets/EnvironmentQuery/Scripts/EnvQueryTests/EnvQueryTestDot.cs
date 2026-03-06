@@ -21,55 +21,63 @@ public class EnvQueryTestDot : EnvQueryTest
     public bool AbsoluteValue;
 
     public DirModeForLineA DirectionA;
-    public Transform Target;
+    public EnvQueryContext TargetContext; // Use context instead of Transform
 
     public DirModeForLineB DirectionB; 
-    public GameObject DirectionVectorObj;
-    public Transform LineFrom;
-    public Transform LineTo;
+    public EnvQueryContext DirectionVectorContext; // Use context
+    public EnvQueryContext LineFromContext;
+    public EnvQueryContext LineToContext;
 
     public override void RunTest(EnvQueryInstance queryInstance, int currentTest)
     {
-        if (!IsActive || Target == null || queryInstance.Items == null) return;
+        if (!IsActive || queryInstance.Items == null) return;
+
+        // Prepare A
+        if (!queryInstance.PrepareContext(TargetContext, out List<Vector3> targetLocations) || targetLocations.Count == 0) return;
+        Vector3 targetPos = targetLocations[0];
+
+        // Prepare B (Direction)
+        Vector3 bDir = Vector3.forward;
+        if (DirectionB == DirModeForLineB.TwoPoints)
+        {
+            if (queryInstance.PrepareContext(LineFromContext, out List<Vector3> fromLocs) && fromLocs.Count > 0 &&
+                queryInstance.PrepareContext(LineToContext, out List<Vector3> toLocs) && toLocs.Count > 0)
+            {
+                bDir = (toLocs[0] - fromLocs[0]).normalized;
+            }
+        }
+        else
+        {
+            if (queryInstance.PrepareContext(DirectionVectorContext, out List<GameObject> contextActors) && contextActors.Count > 0)
+            {
+                Transform contextTransform = contextActors[0].transform;
+                switch (DirectionB)
+                {
+                    case DirModeForLineB.DirectionVector_Forward: bDir = contextTransform.forward; break;
+                    case DirModeForLineB.DirectionVector_Backward: bDir = -contextTransform.forward; break;
+                    case DirModeForLineB.DirectionVector_Right: bDir = contextTransform.right; break;
+                    case DirModeForLineB.DirectionVector_Left: bDir = -contextTransform.right; break;
+                }
+            }
+        }
 
         foreach (EnvQueryItem item in queryInstance.Items)
         {
             if (!item.IsValid) continue;
 
-            Vector3 a = Vector3.zero;
-            Vector3 b = Vector3.zero;
+            Vector3 itemPos = item.GetWorldPosition();
+            Vector3 aDir = Vector3.zero;
 
             if (DirectionA == DirModeForLineA.FromTargetToEachItem)
             {
-                a = (item.GetWorldPosition() - Target.position).normalized;
+                aDir = (itemPos - targetPos).normalized;
             }
             else if (DirectionA == DirModeForLineA.FromEachItemToTarget)
             {
-                a = (Target.position - item.GetWorldPosition()).normalized;
+                aDir = (targetPos - itemPos).normalized;
             }
 
-            if (DirectionB == DirModeForLineB.TwoPoints && LineFrom != null && LineTo != null)
-            {
-                b = (LineTo.position - LineFrom.position).normalized;
-            }
-            else if (DirectionB == DirModeForLineB.DirectionVector_Forward && DirectionVectorObj != null)
-            {
-                b = DirectionVectorObj.transform.forward;
-            }
-            else if (DirectionB == DirModeForLineB.DirectionVector_Backward && DirectionVectorObj != null)
-            {
-                b = -(DirectionVectorObj.transform.forward);
-            }
-            else if (DirectionB == DirModeForLineB.DirectionVector_Right && DirectionVectorObj != null)
-            {
-                b = DirectionVectorObj.transform.right;
-            }
-            else if (DirectionB == DirModeForLineB.DirectionVector_Left && DirectionVectorObj != null)
-            {
-                b = -(DirectionVectorObj.transform.right);
-            }
-
-            float dotValue = Vector3.Dot(a, b);
+            float dotValue = Vector3.Dot(aDir, bDir);
             if (AbsoluteValue)
             {
                 dotValue = Mathf.Abs(dotValue);

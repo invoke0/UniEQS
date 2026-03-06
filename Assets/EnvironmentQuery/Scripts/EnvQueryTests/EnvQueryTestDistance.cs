@@ -9,16 +9,20 @@ public class EnvQueryTestDistance : EnvQueryTest
     {
         if (!IsActive || DistanceTo == null || queryInstance.Items == null) return;
 
-        List<Vector3> contextLocations;
-        DistanceTo.ProvideContext(queryInstance, out contextLocations);
+        if (!queryInstance.PrepareContext(DistanceTo, out List<Vector3> contextLocations))
+        {
+            return;
+        }
 
         if (contextLocations.Count == 0) return;
+
+        Vector3 contextPos = contextLocations[0];
 
         foreach (EnvQueryItem item in queryInstance.Items)
         {
             if (!item.IsValid) continue;
 
-            float distance = Vector3.Distance(contextLocations[0], item.GetWorldPosition());
+            float distance = Vector3.Distance(contextPos, item.GetWorldPosition());
             item.TestResults[currentTest] = distance;
             FilterItem(item, distance);
         }

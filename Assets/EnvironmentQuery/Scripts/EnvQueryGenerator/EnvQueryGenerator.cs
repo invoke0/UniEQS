@@ -7,5 +7,5 @@ using UnityEngine;
  */
 public abstract class EnvQueryGenerator : ScriptableObject
 {
-    public abstract List<EnvQueryItem> GenerateItems(int numTests, Transform centerOfItems);
+    public abstract List<EnvQueryItem> GenerateItems(EnvQueryInstance queryInstance);
 }

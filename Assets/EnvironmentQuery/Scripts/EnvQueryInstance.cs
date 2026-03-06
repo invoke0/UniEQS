@@ -33,6 +33,10 @@ public class EnvQueryInstance
     private int currentTestIndex = -1; // -1 means generation step
     private bool isFinished = false;
 
+    // Caching context results (Simple Dictionary approach suitable for Unity)
+    private Dictionary<EnvQueryContext, List<Vector3>> contextLocationCache = new Dictionary<EnvQueryContext, List<Vector3>>();
+    private Dictionary<EnvQueryContext, List<GameObject>> contextActorCache = new Dictionary<EnvQueryContext, List<GameObject>>();
+
     public EnvQueryInstance(string name, int id, EnvQueryRunMode mode, List<EnvQueryOption> queryOptions, GameObject owner)
     {
         QueryName = name;
@@ -43,6 +47,58 @@ public class EnvQueryInstance
     }
 
     public bool IsFinished() => isFinished;
+
+    public int GetNumTests()
+    {
+        if (options == null || currentOptionIndex >= options.Count) return 0;
+        return options[currentOptionIndex].Tests.Count;
+    }
+
+    public bool PrepareContext(EnvQueryContext context, out List<Vector3> locations)
+    {
+        // Default to Querier if null
+        if (context == null)
+        {
+            locations = new List<Vector3>();
+            if(Owner != null) locations.Add(Owner.transform.position);
+            return true;
+        }
+
+        if (contextLocationCache.TryGetValue(context, out locations))
+        {
+            return locations != null && locations.Count > 0;
+        }
+
+        context.ProvideContext(this, out locations);
+        
+        // Cache even if null/empty to avoid re-calculating
+        contextLocationCache[context] = locations;
+        
+        return locations != null && locations.Count > 0;
+    }
+
+    public bool PrepareContext(EnvQueryContext context, out List<GameObject> actors)
+    {
+        // Default to Querier if null
+        if (context == null)
+        {
+            actors = new List<GameObject>();
+            if(Owner != null) actors.Add(Owner);
+            return true;
+        }
+
+        if (contextActorCache.TryGetValue(context, out actors))
+        {
+            return actors != null && actors.Count > 0;
+        }
+
+        context.ProvideContext(this, out actors);
+        
+        // Cache even if null/empty to avoid re-calculating
+        contextActorCache[context] = actors;
+
+        return actors != null && actors.Count > 0;
+    }
 
     public void ExecuteOneStep(float timeLimit)
     {
@@ -64,7 +120,7 @@ public class EnvQueryInstance
             // Generation step
             if (currentOption.Generator != null && Owner != null)
             {
-                Items = currentOption.Generator.GenerateItems(currentOption.Tests.Count, Owner.transform);
+                Items = currentOption.Generator.GenerateItems(this);
                 foreach (var item in Items)
                 {
                     item.UpdateNavMeshProjection();

@@ -21,8 +21,11 @@ public class EnvQueryTestTrace : EnvQueryTest
     {
         if (!IsActive || TraceFrom == null || queryInstance.Items == null) return;
 
-        List<Vector3> contextLocations;
-        TraceFrom.ProvideContext(queryInstance, out contextLocations);
+        if (!queryInstance.PrepareContext(TraceFrom, out List<Vector3> contextLocations))
+        {
+            return;
+        }
+
         if (contextLocations.Count == 0) return;
 
         Vector3 fromPos = contextLocations[0] + Vector3.up * TargetHeightOffset;

@@ -17,8 +17,11 @@ public class EnvQueryTestPathFinding : EnvQueryTest
     {
         if (!IsActive || Target == null || queryInstance.Items == null) return;
 
-        List<Vector3> contextLocations;
-        Target.ProvideContext(queryInstance, out contextLocations);
+        if (!queryInstance.PrepareContext(Target, out List<Vector3> contextLocations))
+        {
+            return;
+        }
+        
         if (contextLocations.Count == 0) return;
 
         Vector3 targetPos = contextLocations[0];
