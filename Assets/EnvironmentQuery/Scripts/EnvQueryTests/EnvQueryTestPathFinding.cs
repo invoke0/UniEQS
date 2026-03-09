@@ -1,73 +1,61 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.Collections;
 
 public class EnvQueryTestPathFinding : EnvQueryTest
 {
-    public enum PathFindingTestType
-    {
-        PathExist,
-        PathLength
-    }
-
-    public PathFindingTestType PathFindingType;
     public EnvQueryContext Target;
+    public bool TestPathExist = true;
+    public bool TestPathCost = false;
+    public bool TestPathLength = false;
+    public bool FilterIfNoPath = true;
 
-    public override void RunTest(EnvQueryInstance queryInstance, int currentTest)
+    public override void RunTest(EnvQueryInstance queryInstance)
     {
-        if (!IsActive || Target == null || queryInstance.Items == null) return;
+        if (!queryInstance.PrepareContext(Target, out List<Vector3> targetPoints)) return;
 
-        if (!queryInstance.PrepareContext(Target, out List<Vector3> contextLocations))
-        {
-            return;
-        }
-        
-        if (contextLocations.Count == 0) return;
+        if (targetPoints.Count == 0) return;
+        Vector3 targetPos = targetPoints[0]; // Simplified single target
 
-        Vector3 targetPos = contextLocations[0];
         NavMeshPath path = new NavMeshPath();
 
-        foreach (EnvQueryItem item in queryInstance.Items)
+        for (int i = 0; i < queryInstance.Items.Length; i++)
         {
+            var item = queryInstance.Items[i];
             if (!item.IsValid) continue;
 
-            float result = 0.0f;
-            NavMesh.CalculatePath(item.GetWorldPosition(), targetPos, NavMesh.AllAreas, path);
-
-            if (PathFindingType == PathFindingTestType.PathExist)
+            bool hasPath = NavMesh.CalculatePath(item.GetWorldPosition(), targetPos, NavMesh.AllAreas, path);
+            
+            if (FilterIfNoPath && (!hasPath || path.status != NavMeshPathStatus.PathComplete))
             {
-                result = (path.status == NavMeshPathStatus.PathComplete) ? 1.0f : 0.0f;
-            }
-            else if (PathFindingType == PathFindingTestType.PathLength)
-            {
-                if (path.status == NavMeshPathStatus.PathComplete)
-                {
-                    result = CalculatePathLength(item.GetWorldPosition(), path);
-                }
-                else
-                {
-                    result = 10000.0f; // Large value for unreachable
-                }
+                item.IsValid = false;
+                queryInstance.Items[i] = item;
+                // Also set result to skipped so it doesn't affect normalization
+                queryInstance.SetTestResult(i, queryInstance.currentTestIndex, EnvQueryTypes.SkippedItemValue);
+                continue;
             }
 
-            item.TestResults[currentTest] = result;
-            FilterItem(item, result);
+            float score = 0f;
+            if (TestPathLength)
+            {
+                float length = 0f;
+                if (path.corners.Length > 1)
+                {
+                    for (int k = 0; k < path.corners.Length - 1; k++)
+                    {
+                        length += Vector3.Distance(path.corners[k], path.corners[k + 1]);
+                    }
+                }
+                score = length;
+            }
+            // Cost is harder to get directly without extra setup, skipping for now or treating as length
+
+            // Store raw score (distance)
+            // Smaller distance is usually better, handled by negative ScoringFactor or InverseLinear equation
+            queryInstance.SetTestResult(i, queryInstance.currentTestIndex, score);
         }
-    }
 
-    private float CalculatePathLength(Vector3 startPosition, NavMeshPath path)
-    {
-        if (path.corners.Length < 1) return 0.0f;
-
-        float lengthSoFar = Vector3.Distance(startPosition, path.corners[0]);
-        Vector3 previousCorner = path.corners[0];
-        for (int i = 1; i < path.corners.Length; i++)
-        {
-            Vector3 currentCorner = path.corners[i];
-            lengthSoFar += Vector3.Distance(previousCorner, currentCorner);
-            previousCorner = currentCorner;
-        }
-
-        return lengthSoFar;
+        NormalizeItemScores(queryInstance);
     }
 }

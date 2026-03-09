@@ -16,9 +16,9 @@ public class NPCController : MonoBehaviour
 
 	void Update()
 	{
-		if(query != null && query.BestResult != null)
+		if(query != null && query._instance != null && query.BestResult.IsValid)
 		{
 			agent.SetDestination(query.BestResult.GetWorldPosition());
-		}		
+		}
 	}
 }

@@ -9,8 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7e6bd6d8ca7e08343a466ec43410d1da, type: 3}
-  m_Name: GeneratorOnCircle
+  m_Script: {fileID: 11500000, guid: 9b97ba56c542307408bbfdaae35ad3f2, type: 3}
+  m_Name: EnvQueryContext_Supporter
   m_EditorClassIdentifier: 
-  Radius: 10
-  SpaceBetween: 1
+  GameObjectName: Supporter

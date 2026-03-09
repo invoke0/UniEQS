@@ -1,71 +1,44 @@
-using System.Collections.Generic;
+using System;
 using UnityEngine;
-using UnityEngine.AI;
 
-public class EnvQueryItem
+[Serializable]
+public struct EnvQueryItem
 {
     public float Score;
     public bool IsValid;
-    public float[] TestResults;
-    public GameObject Actor; // Store associated actor if this item is an actor
 
-    private Vector3 worldPosition; // Absolute world position
-    private Vector3 navWorldPosition; // Absolute world position (after NavMesh projection)
+    private Vector3 worldPosition;
+    private Vector3 navWorldPosition;
+    
+    // Using InstanceID (int) instead of reference
+    public int ActorInstanceID;
 
-    public EnvQueryItem(int numTests, Vector3 absoluteWorldPosition, GameObject actor = null)
+    // We store the START INDEX into the flat TestResults array in EnvQueryInstance
+    // For example, if there are 3 tests, item 0 starts at index 0, item 1 starts at index 3...
+    // Actually we can just compute this index from ItemIndex * NumTests if we know NumTests
+    // But keeping it flexible if items differ (which they shouldn't in one query)
+    // Simpler: Just rely on flat indexing logic in Instance
+
+    public EnvQueryItem(Vector3 position, int actorID = 0)
     {
         Score = 0.0f;
         IsValid = true;
-        TestResults = new float[numTests];
-        for (int i = 0; i < numTests; i++) TestResults[i] = EnvQueryTypes.SkippedItemValue;
-        
-        this.worldPosition = absoluteWorldPosition;
-        this.navWorldPosition = absoluteWorldPosition;
-        this.Actor = actor;
+        this.worldPosition = position;
+        this.navWorldPosition = position;
+        this.ActorInstanceID = actorID;
     }
 
     public Vector3 GetWorldPosition()
     {
-        if (Actor != null) return Actor.transform.position;
+        // If ActorID != 0, we can't efficiently resolve it here without context.
+        // The context/manager should resolve it if needed, or update worldPosition before query.
+        // For performance, we assume worldPosition is updated or valid.
         return navWorldPosition;
     }
 
-    public void Discard()
+    public void SetWorldPosition(Vector3 pos)
     {
-        IsValid = false;
-        Score = -float.MaxValue;
-    }
-
-    public void UpdateNavMeshProjection()
-    {
-        // If it's an actor, we don't project its position (usually)
-        if (Actor != null)
-        {
-            IsValid = true;
-            return;
-        }
-
-        NavMeshHit result;
-        if (NavMesh.SamplePosition(worldPosition, out result, 3.0f, NavMesh.AllAreas))
-        {
-            float diff = (result.position.x - worldPosition.x)*(result.position.x - worldPosition.x)
-                       + (result.position.z - worldPosition.z)*(result.position.z - worldPosition.z);
-
-            if(diff < 0.0001f)
-            {
-                IsValid = true;
-                navWorldPosition = result.position;
-            }
-            else
-            {
-                IsValid = false;
-                navWorldPosition = worldPosition;
-            }
-        }
-        else
-        {
-            IsValid = false;
-            navWorldPosition = worldPosition;
-        }
+        worldPosition = pos;
+        navWorldPosition = pos;
     }
 }

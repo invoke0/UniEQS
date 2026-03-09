@@ -1,5 +1,40 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-6357769377778783804
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e6bd6d8ca7e08343a466ec43410d1da, type: 3}
+  m_Name: EnvQueryGeneratorOnCircle
+  m_EditorClassIdentifier: 
+  SearchCenter: {fileID: 11400000, guid: 38ad3e8069649414a897149f64333473, type: 2}
+  Radius: 4
+  SpaceBetween: 1
+--- !u!114 &-3248700842635963173
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d4871b264fdfff4da969dd9ea97abd7, type: 3}
+  m_Name: EnvQueryTestDistance
+  m_EditorClassIdentifier: 
+  TestPurpose: 2
+  FilterType: 2
+  FloatValueMin: 0
+  FloatValueMax: 100
+  BoolValue: 1
+  ScoringEquation: 0
+  ScoringFactor: 1
+  DistanceTo: {fileID: 11400000, guid: 38ad3e8069649414a897149f64333473, type: 2}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14,5 +49,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   QueryName: 
   Options:
-  - Generator: {fileID: 11400000, guid: 59079a026de7bb64298bbe81a0522cfc, type: 2}
-    Tests: []
+  - Generator: {fileID: -6357769377778783804}
+    Tests:
+    - {fileID: -3248700842635963173}

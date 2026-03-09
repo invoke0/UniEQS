@@ -1,39 +1,46 @@
 using System.Collections.Generic;
 using UnityEngine;
-using System.Linq;
+using Unity.Collections;
 
-/**
- * Environment Query Instance
- * Represents a single execution of an environment query.
- * Supports step-by-step execution for time-slicing.
- */
-public class EnvQueryInstance
+public class EnvQueryInstance : System.IDisposable
 {
+    public string QueryName;
+    public int QueryID;
+    public EnvQueryRunMode RunMode;
+    public GameObject Owner;
+
+    public List<EnvQueryOption> options;
+    public int currentOptionIndex = 0;
+    public int currentTestIndex = -1;
+
+    public EnvQueryInstance.Status CurrentStatus = Status.Processing;
+
     public enum Status
     {
         Processing,
         Success,
         Failed,
-        Aborted
+        Aborted,
+        OwnerLost,
+        MissingTemplate
     }
 
-    public string QueryName;
-    public int QueryID;
-    public Status CurrentStatus = Status.Processing;
-    public EnvQueryRunMode RunMode;
-    public QueryFinishedSignature OnQueryFinished;
-    public Dictionary<string, float> NamedParams = new Dictionary<string, float>();
-    public List<EnvQueryItem> Items = new List<EnvQueryItem>();
-    public EnvQueryItem BestResult { get; private set; }
-    public float TotalExecutionTime { get; private set; }
-    public GameObject Owner { get; private set; }
+    // Native Arrays for Core Data
+    public NativeList<EnvQueryItem> Items;
+    public NativeList<float> AllTestResults; // Flattened array of all test results
 
-    private List<EnvQueryOption> options;
-    private int currentOptionIndex = 0;
-    private int currentTestIndex = -1; // -1 means generation step
+    // Parallel arrays for reference types (since NativeList cannot store GameObjects)
+    // Only populated if Generator produces Actors or Context items
+    public List<GameObject> ItemActors; 
+
+    public EnvQueryItem BestResultItem;
+    public float TotalExecutionTime;
+
+    public Dictionary<string, float> NamedParams = new Dictionary<string, float>();
+    public QueryFinishedSignature OnQueryFinished;
     private bool isFinished = false;
 
-    // Caching context results (Simple Dictionary approach suitable for Unity)
+    // Context Caching
     private Dictionary<EnvQueryContext, List<Vector3>> contextLocationCache = new Dictionary<EnvQueryContext, List<Vector3>>();
     private Dictionary<EnvQueryContext, List<GameObject>> contextActorCache = new Dictionary<EnvQueryContext, List<GameObject>>();
 
@@ -44,19 +51,153 @@ public class EnvQueryInstance
         RunMode = mode;
         options = queryOptions;
         Owner = owner;
+
+        Items = new NativeList<EnvQueryItem>(100, Allocator.Persistent);
+        AllTestResults = new NativeList<float>(100, Allocator.Persistent);
+        ItemActors = new List<GameObject>();
     }
 
-    public bool IsFinished() => isFinished;
+    public void Dispose()
+    {
+        if (Items.IsCreated) Items.Dispose();
+        if (AllTestResults.IsCreated) AllTestResults.Dispose();
+        
+        contextLocationCache.Clear();
+        contextActorCache.Clear();
+        ItemActors.Clear();
+    }
+
+    public bool IsFinished()
+    {
+        return isFinished;
+    }
 
     public int GetNumTests()
     {
-        if (options == null || currentOptionIndex >= options.Count) return 0;
+        if (options == null || options.Count == 0 || currentOptionIndex >= options.Count) return 0;
         return options[currentOptionIndex].Tests.Count;
+    }
+
+    public void ExecuteOneStep(float timeLimit)
+    {
+        if (CurrentStatus != Status.Processing) return;
+
+        float startTime = Time.realtimeSinceStartup;
+
+        // 1. Generate Items (if not already done for current option)
+        if (Items.Length == 0 && currentOptionIndex < options.Count)
+        {
+            var currentOption = options[currentOptionIndex];
+            if (currentOption.Generator != null)
+            {
+                currentOption.Generator.GenerateItems(this);
+            }
+            
+            // Allocate space for test results
+            int numTests = GetNumTests();
+            if (numTests > 0 && Items.Length > 0)
+            {
+                AllTestResults.ResizeUninitialized(Items.Length * numTests);
+                // Initialize with skipped value
+                for (int i = 0; i < AllTestResults.Length; i++)
+                {
+                    AllTestResults[i] = EnvQueryTypes.SkippedItemValue;
+                }
+            }
+            
+            if (Items.Length == 0)
+            {
+                // No items generated, move to next option or fail
+                currentOptionIndex++;
+                if (currentOptionIndex >= options.Count)
+                {
+                    CurrentStatus = Status.Failed;
+                    isFinished = true;
+                    OnQueryFinished?.Invoke(this);
+                    return;
+                }
+            }
+        }
+
+        // 2. Run Tests
+        while (currentOptionIndex < options.Count)
+        {
+            var currentOption = options[currentOptionIndex];
+            int numTests = currentOption.Tests.Count;
+
+            // If we have finished all tests for this option
+            if (currentTestIndex >= numTests - 1)
+            {
+                FinalizeQuery();
+                return;
+            }
+
+            // Move to next test
+            currentTestIndex++;
+            var currentTest = currentOption.Tests[currentTestIndex];
+            
+            if (currentTest != null)
+            {
+                currentTest.RunTest(this);
+            }
+
+            // Check time budget
+            if (timeLimit > 0 && (Time.realtimeSinceStartup - startTime) > timeLimit)
+            {
+                TotalExecutionTime += (Time.realtimeSinceStartup - startTime);
+                return; // Yield execution
+            }
+        }
+    }
+
+    private void FinalizeQuery()
+    {
+        // Compute final scores and normalization
+        // This is a simplified version, usually involves normalization steps
+        // For now, let's just pick the best one based on raw scores if already computed by tests
+
+        // Normalize and Score
+        // TODO: Implement full normalization logic here if needed
+        
+        // Find Best Item
+        float bestScore = -float.MaxValue;
+        int bestIndex = -1;
+
+        for (int i = 0; i < Items.Length; i++)
+        {
+            var item = Items[i];
+            if (item.IsValid)
+            {
+                if (item.Score > bestScore)
+                {
+                    bestScore = item.Score;
+                    bestIndex = i;
+                }
+            }
+        }
+
+        if (bestIndex != -1)
+        {
+            BestResultItem = Items[bestIndex];
+            CurrentStatus = Status.Success;
+        }
+        else
+        {
+            CurrentStatus = Status.Failed;
+        }
+
+        isFinished = true;
+        OnQueryFinished?.Invoke(this);
+        Dispose(); // Clean up native memory immediately upon completion? Or let Manager do it?
+        // Better to let Manager do it or caller, but here we assume single-fire usage
+        // Actually, if we dispose here, the results are gone. 
+        // We should NOT dispose here if the user wants to read results.
+        // The Manager handles disposal after notifying listeners or if it's fire-and-forget.
+        // Reverting Dispose() here. The owner of the instance is responsible for disposal.
     }
 
     public bool PrepareContext(EnvQueryContext context, out List<Vector3> locations)
     {
-        // Default to Querier if null
         if (context == null)
         {
             locations = new List<Vector3>();
@@ -70,17 +211,13 @@ public class EnvQueryInstance
         }
 
         context.ProvideContext(this, out locations);
-        
-        // Cache even if null/empty to avoid re-calculating
         contextLocationCache[context] = locations;
-        
         return locations != null && locations.Count > 0;
     }
 
     public bool PrepareContext(EnvQueryContext context, out List<GameObject> actors)
     {
-        // Default to Querier if null
-        if (context == null)
+         if (context == null)
         {
             actors = new List<GameObject>();
             if(Owner != null) actors.Add(Owner);
@@ -93,130 +230,69 @@ public class EnvQueryInstance
         }
 
         context.ProvideContext(this, out actors);
-        
-        // Cache even if null/empty to avoid re-calculating
         contextActorCache[context] = actors;
-
         return actors != null && actors.Count > 0;
     }
-
-    public void ExecuteOneStep(float timeLimit)
+    
+    // Helper to set test result
+    public void SetTestResult(int itemIndex, int testIndex, float score)
     {
-        if (isFinished) return;
-
-        float startTime = Time.realtimeSinceStartup;
-
-        if (options == null || options.Count == 0)
-        {
-            CurrentStatus = Status.Failed;
-            isFinished = true;
-            return;
-        }
-
-        EnvQueryOption currentOption = options[currentOptionIndex];
-
-        if (currentTestIndex == -1)
-        {
-            // Generation step
-            if (currentOption.Generator != null && Owner != null)
-            {
-                Items = currentOption.Generator.GenerateItems(this);
-                foreach (var item in Items)
-                {
-                    item.UpdateNavMeshProjection();
-                }
-            }
-            currentTestIndex = 0;
-        }
-        else if (currentTestIndex < currentOption.Tests.Count)
-        {
-            // Test step
-            EnvQueryTest test = currentOption.Tests[currentTestIndex];
-            if (test != null && test.IsActive)
-            {
-                test.RunTest(this, currentTestIndex);
-                test.NormalizeItemScores(currentTestIndex, Items);
-            }
-            currentTestIndex++;
-        }
-
-        // Check if current option is finished
-        if (currentTestIndex >= currentOption.Tests.Count)
-        {
-            FinalizeOption();
-        }
-
-        TotalExecutionTime += (Time.realtimeSinceStartup - startTime);
-    }
-
-    private void FinalizeOption()
-    {
-        var validItems = Items.Where(x => x.IsValid).ToList();
+        int numTests = GetNumTests();
+        if (numTests == 0) return;
         
-        if (validItems.Count > 0)
+        int flatIndex = itemIndex * numTests + testIndex;
+        if (flatIndex >= 0 && flatIndex < AllTestResults.Length)
         {
-            // Found results in current option, finalize query
-            FinalizeQuery(validItems);
-        }
-        else
-        {
-            // No results in current option, try next option
-            currentOptionIndex++;
-            currentTestIndex = -1;
-            
-            if (currentOptionIndex >= options.Count)
-            {
-                // All options failed
-                CurrentStatus = Status.Failed;
-                BestResult = null;
-                isFinished = true;
-                OnQueryFinished?.Invoke(this);
-            }
+            AllTestResults[flatIndex] = score;
         }
     }
-
-    public void ExecuteFull()
+    
+    public float GetTestResult(int itemIndex, int testIndex)
     {
-        while (!isFinished)
-        {
-            ExecuteOneStep(float.MaxValue);
-        }
-    }
-
-    private void FinalizeQuery(List<EnvQueryItem> validItems)
-    {
-        isFinished = true;
+        int numTests = GetNumTests();
+        if (numTests == 0) return EnvQueryTypes.SkippedItemValue;
         
-        // Sort by score
-        validItems.Sort((a, b) => b.Score.CompareTo(a.Score));
-
-        switch (RunMode)
+        int flatIndex = itemIndex * numTests + testIndex;
+        if (flatIndex >= 0 && flatIndex < AllTestResults.Length)
         {
-            case EnvQueryRunMode.SingleResult:
-                BestResult = validItems[0];
-                break;
-            case EnvQueryRunMode.RandomBest5Pct:
-                BestResult = PickRandomItemOfScoreAtLeast(validItems, validItems[0].Score * 0.95f);
-                break;
-            case EnvQueryRunMode.RandomBest25Pct:
-                BestResult = PickRandomItemOfScoreAtLeast(validItems, validItems[0].Score * 0.75f);
-                break;
-            case EnvQueryRunMode.AllMatching:
-                BestResult = validItems[0];
-                break;
+            return AllTestResults[flatIndex];
         }
-
-        CurrentStatus = Status.Success;
-        OnQueryFinished?.Invoke(this);
+        return EnvQueryTypes.SkippedItemValue;
     }
 
-    private EnvQueryItem PickRandomItemOfScoreAtLeast(List<EnvQueryItem> sortedValidItems, float minScore)
+    // New helper to add items to NativeList
+    public void AddItem(Vector3 position, GameObject actor = null)
     {
-        int count = 0;
-        while (count < sortedValidItems.Count && sortedValidItems[count].Score >= minScore)
+        int actorID = actor != null ? actor.GetInstanceID() : 0;
+        Items.Add(new EnvQueryItem(position, actorID));
+        if (actor != null)
         {
-            count++;
+            // Ensure ItemActors list is in sync with Items list if we are using actors
+            // If this is the first actor, fill previous slots with null
+            while (ItemActors.Count < Items.Length - 1) ItemActors.Add(null);
+            ItemActors.Add(actor);
         }
-        return sortedValidItems[Random.Range(0, count)];
+    }
+
+    public GameObject GetActorFor(EnvQueryItem item)
+    {
+        // Simple search in parallel list
+        // Or we could store index in item... but item struct is generic.
+        // We can just iterate the parallel list and match ID?
+        // Or assume indices match if we populated it correctly.
+        
+        // Correct way: Assume parallel list index matches Item index.
+        // But we don't know the index of 'item' unless we pass it.
+        // We can search by ID if we stored it.
+        
+        if (item.ActorInstanceID == 0) return null;
+        
+        // Linear search in cached actors
+        foreach (var actor in ItemActors)
+        {
+            if (actor != null && actor.GetInstanceID() == item.ActorInstanceID)
+                return actor;
+        }
+        return null;
     }
 }

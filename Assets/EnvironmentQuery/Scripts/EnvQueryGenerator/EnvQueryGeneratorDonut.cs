@@ -1,34 +1,27 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
 
-[CreateAssetMenu(fileName = "GeneratorDonut", menuName = "Environment Query/Generators/Donut")]
 public class EnvQueryGeneratorDonut : EnvQueryGenerator
 {
     public EnvQueryContext SearchCenter;
-    public float InnerRadius = 1.0f;
-    public float OuterRadius = 5.0f;
-    public int NumberOfRings = 3;
+    public float InnerRadius = 2.0f;
+    public float OuterRadius = 6.0f;
+    public int NumberOfRings = 4;
     public int PointsPerRing = 8;
 
-    public override List<EnvQueryItem> GenerateItems(EnvQueryInstance queryInstance)
+    public override void GenerateItems(EnvQueryInstance queryInstance)
     {
-        List<EnvQueryItem> items = new List<EnvQueryItem>();
+        if (!queryInstance.PrepareContext(SearchCenter, out List<Vector3> centerPoints)) return;
         
-        if (!queryInstance.PrepareContext(SearchCenter, out List<Vector3> centerPoints))
-        {
-            return items;
-        }
-
-        int numTests = queryInstance.GetNumTests();
-
-        float radiusDelta = (NumberOfRings > 1) ? (OuterRadius - InnerRadius) / (NumberOfRings - 1) : 0;
-        float angleDelta = (2 * Mathf.PI) / PointsPerRing;
+        float radiusStep = (OuterRadius - InnerRadius) / Mathf.Max(1, NumberOfRings - 1);
+        float angleDelta = 2 * Mathf.PI / PointsPerRing;
 
         foreach (Vector3 centerPos in centerPoints)
         {
             for (int ringIdx = 0; ringIdx < NumberOfRings; ringIdx++)
             {
-                float currentRadius = InnerRadius + (ringIdx * radiusDelta);
+                float currentRadius = InnerRadius + (radiusStep * ringIdx);
                 for (int pointIdx = 0; pointIdx < PointsPerRing; pointIdx++)
                 {
                     float angle = pointIdx * angleDelta;
@@ -37,11 +30,9 @@ public class EnvQueryGeneratorDonut : EnvQueryGenerator
                         0,
                         currentRadius * Mathf.Sin(angle)
                     );
-                    items.Add(new EnvQueryItem(numTests, centerPos + offset));
+                    queryInstance.AddItem(centerPos + offset);
                 }
             }
         }
-
-        return items;
     }
 }

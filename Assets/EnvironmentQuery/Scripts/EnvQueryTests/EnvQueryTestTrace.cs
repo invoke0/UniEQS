@@ -1,57 +1,49 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
 
 public class EnvQueryTestTrace : EnvQueryTest
 {
-    private enum TraceType
-    {
-        Visible,
-        Invisible
-    }
-
-    [SerializeField]
-    private TraceType traceType = TraceType.Visible;
-
     public EnvQueryContext TraceFrom;
+    public EnvQueryContext TraceTo;
+    public LayerMask TraceMask;
+    public bool Inverse = false; // Inverse result (hit is bad vs good)
 
-    public float ItemHeightOffset;
-    public float TargetHeightOffset;
-
-    public override void RunTest(EnvQueryInstance queryInstance, int currentTest)
+    public override void RunTest(EnvQueryInstance queryInstance)
     {
-        if (!IsActive || TraceFrom == null || queryInstance.Items == null) return;
+        if (!queryInstance.PrepareContext(TraceFrom, out List<Vector3> fromPoints)) return;
+        // TraceTo usually is the item itself, but could be another context
+        // Assuming TraceTo is not set => use Item location
+        // If TraceTo is set => use Context location
 
-        if (!queryInstance.PrepareContext(TraceFrom, out List<Vector3> contextLocations))
+        Vector3 fromPos = fromPoints.Count > 0 ? fromPoints[0] : Vector3.zero;
+
+        for (int i = 0; i < queryInstance.Items.Length; i++)
         {
-            return;
-        }
-
-        if (contextLocations.Count == 0) return;
-
-        Vector3 fromPos = contextLocations[0] + Vector3.up * TargetHeightOffset;
-
-        foreach (EnvQueryItem item in queryInstance.Items)
-        {
+            var item = queryInstance.Items[i];
             if (!item.IsValid) continue;
 
-            Vector3 itemPosition = item.GetWorldPosition() + Vector3.up * ItemHeightOffset;
-            Vector3 direction = fromPos - itemPosition;
-            float distance = direction.magnitude;
+            Vector3 itemPos = item.GetWorldPosition();
+            
+            // Vector from 'From' to 'Item'
+            Vector3 direction = (itemPos - fromPos).normalized;
+            float distance = Vector3.Distance(fromPos, itemPos);
+            
+            bool hit = Physics.Raycast(fromPos, direction, out RaycastHit hitInfo, distance, TraceMask);
+            
+            // If inverse: hit means BLOCKED (bad visibility), no hit means CLEAR (good visibility)
+            // If not inverse: hit means YES (can see something?), usually trace is for VISIBILITY
+            // Standard visibility test: No Hit = Visible (Good)
+            
+            bool isVisible = !hit;
+            if (Inverse) isVisible = !isVisible;
 
-            bool hit = Physics.Raycast(itemPosition, direction.normalized, out RaycastHit raycastHit, distance);
-
-            float result = 0.0f;
-            if (!hit) // Visible
-            {
-                result = (traceType == TraceType.Visible) ? 1.0f : 0.0f;
-            }
-            else
-            {
-                result = (traceType == TraceType.Invisible) ? 1.0f : 0.0f;
-            }
-
-            item.TestResults[currentTest] = result;
-            FilterItem(item, result);
+            // Score: 1 if visible, 0 if not (Boolean test)
+            float score = isVisible ? 1.0f : 0.0f;
+            
+            queryInstance.SetTestResult(i, queryInstance.currentTestIndex, score);
         }
+
+        NormalizeItemScores(queryInstance);
     }
 }

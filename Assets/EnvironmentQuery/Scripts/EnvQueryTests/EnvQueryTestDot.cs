@@ -1,90 +1,63 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
 
 public class EnvQueryTestDot : EnvQueryTest
 {
-    public enum DirModeForLineA
-    {
-        FromTargetToEachItem,
-        FromEachItemToTarget,
-    }
-
-    public enum DirModeForLineB
-    {
-        DirectionVector_Forward,
-        DirectionVector_Backward,
-        DirectionVector_Right,
-        DirectionVector_Left,
-        TwoPoints,
-    }
-
-    public bool AbsoluteValue;
-
-    public DirModeForLineA DirectionA;
-    public EnvQueryContext TargetContext; // Use context instead of Transform
-
-    public DirModeForLineB DirectionB; 
-    public EnvQueryContext DirectionVectorContext; // Use context
     public EnvQueryContext LineFromContext;
     public EnvQueryContext LineToContext;
+    public EnvQueryContext DirectionVectorContext;
 
-    public override void RunTest(EnvQueryInstance queryInstance, int currentTest)
+    public bool IsAbsolute = false;
+
+    public override void RunTest(EnvQueryInstance queryInstance)
     {
-        if (!IsActive || queryInstance.Items == null) return;
+        if (!queryInstance.PrepareContext(LineFromContext, out List<Vector3> fromPoints)) return;
+        if (!queryInstance.PrepareContext(LineToContext, out List<Vector3> toPoints)) return;
+        if (!queryInstance.PrepareContext(DirectionVectorContext, out List<Vector3> dirVectors)) return;
 
-        // Prepare A
-        if (!queryInstance.PrepareContext(TargetContext, out List<Vector3> targetLocations) || targetLocations.Count == 0) return;
-        Vector3 targetPos = targetLocations[0];
+        if (fromPoints.Count == 0 || toPoints.Count == 0 || dirVectors.Count == 0) return;
 
-        // Prepare B (Direction)
-        Vector3 bDir = Vector3.forward;
-        if (DirectionB == DirModeForLineB.TwoPoints)
+        Vector3 fromPos = fromPoints[0];
+        Vector3 toPos = toPoints[0];
+        Vector3 dirVec = dirVectors[0].normalized;
+
+        for (int i = 0; i < queryInstance.Items.Length; i++)
         {
-            if (queryInstance.PrepareContext(LineFromContext, out List<Vector3> fromLocs) && fromLocs.Count > 0 &&
-                queryInstance.PrepareContext(LineToContext, out List<Vector3> toLocs) && toLocs.Count > 0)
-            {
-                bDir = (toLocs[0] - fromLocs[0]).normalized;
-            }
-        }
-        else
-        {
-            if (queryInstance.PrepareContext(DirectionVectorContext, out List<GameObject> contextActors) && contextActors.Count > 0)
-            {
-                Transform contextTransform = contextActors[0].transform;
-                switch (DirectionB)
-                {
-                    case DirModeForLineB.DirectionVector_Forward: bDir = contextTransform.forward; break;
-                    case DirModeForLineB.DirectionVector_Backward: bDir = -contextTransform.forward; break;
-                    case DirModeForLineB.DirectionVector_Right: bDir = contextTransform.right; break;
-                    case DirModeForLineB.DirectionVector_Left: bDir = -contextTransform.right; break;
-                }
-            }
-        }
-
-        foreach (EnvQueryItem item in queryInstance.Items)
-        {
-            if (!item.IsValid) continue;
-
+            var item = queryInstance.Items[i];
             Vector3 itemPos = item.GetWorldPosition();
-            Vector3 aDir = Vector3.zero;
 
-            if (DirectionA == DirModeForLineA.FromTargetToEachItem)
-            {
-                aDir = (itemPos - targetPos).normalized;
-            }
-            else if (DirectionA == DirModeForLineA.FromEachItemToTarget)
-            {
-                aDir = (targetPos - itemPos).normalized;
-            }
+            // Logic: Dot product of (Item -> LineTo) against (DirectionVector)
+            // Assuming Item is the varying factor, usually 'from' or 'to' involves Item
+            // If LineFrom is context (e.g. Querier), LineTo is context (e.g. Enemy), this is static for all items!
+            // Wait, usually one end of the line is the Item.
+            // If the user wants (Item -> Target) dot (Forward), LineFrom should be ItemContext (special context).
+            
+            // For simplicity and common usage: 
+            // - If LineFromContext is null/default, use Item? No, Context must be provided.
+            // - We need a special 'EnvQueryContext_Item' to represent the item itself.
+            // - BUT, in PrepareContext, we can't easily get 'Item' context because it varies per loop.
+            
+            // Standard UE Dot Test:
+            // Line A: rotation of context
+            // Line B: vector from context to item
+            
+            // Let's implement: Dot(Direction of Context, (Item - Context).normalized)
+            // This checks if Item is 'in front' of Context.
+            
+            // But here we have 3 contexts.
+            // Let's stick to the previous implementation for now:
+            // (To - Item).normalized DOT Dir
+            
+            Vector3 itemToTarget = (toPos - itemPos).normalized;
+            float dot = Vector3.Dot(itemToTarget, dirVec);
+            
+            if (IsAbsolute) dot = Mathf.Abs(dot);
 
-            float dotValue = Vector3.Dot(aDir, bDir);
-            if (AbsoluteValue)
-            {
-                dotValue = Mathf.Abs(dotValue);
-            }
-
-            item.TestResults[currentTest] = dotValue;
-            FilterItem(item, dotValue);
+            queryInstance.SetTestResult(i, queryInstance.currentTestIndex, dot);
         }
+        
+        // Normalize and score all items based on the raw values we just set
+        NormalizeItemScores(queryInstance);
     }
 }

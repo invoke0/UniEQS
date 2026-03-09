@@ -1,50 +1,46 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
 
-[CreateAssetMenu(fileName = "GeneratorActorsOfClass", menuName = "Environment Query/Generators/Actors Of Class")]
 public class EnvQueryGeneratorActorsOfClass : EnvQueryGenerator
 {
     public EnvQueryContext SearchCenter;
-    public string SearchedTag = "Enemy";
+    public string TagToSearch = "Enemy";
     public float SearchRadius = 50.0f;
-    public bool UseRadius = true;
 
-    public override List<EnvQueryItem> GenerateItems(EnvQueryInstance queryInstance)
+    public override void GenerateItems(EnvQueryInstance queryInstance)
     {
-        List<EnvQueryItem> items = new List<EnvQueryItem>();
-        if (string.IsNullOrEmpty(SearchedTag)) return items;
+        if (!queryInstance.PrepareContext(SearchCenter, out List<Vector3> centerPoints)) return;
 
-        GameObject[] allActors = GameObject.FindGameObjectsWithTag(SearchedTag);
-        
-        if (!queryInstance.PrepareContext(SearchCenter, out List<Vector3> centerPoints))
-        {
-            return items;
-        }
-
-        int numTests = queryInstance.GetNumTests();
-        float radiusSq = SearchRadius * SearchRadius;
+        // Find all GameObjects with tag
+        GameObject[] actors = GameObject.FindGameObjectsWithTag(TagToSearch);
+        float sqrRadius = SearchRadius * SearchRadius;
 
         foreach (Vector3 centerPos in centerPoints)
         {
-            foreach (GameObject actor in allActors)
+            foreach (var actor in actors)
             {
-                if (UseRadius)
+                if (Vector3.SqrMagnitude(actor.transform.position - centerPos) <= sqrRadius)
                 {
-                    if (Vector3.SqrMagnitude(actor.transform.position - centerPos) > radiusSq)
+                    // Check if we already added this actor (by ID) to avoid duplicates if multiple centers overlap
+                    // This check is a bit slow with large lists, but correct for multi-center overlap
+                    int actorID = actor.GetInstanceID();
+                    bool exists = false;
+                    for(int i=0; i<queryInstance.Items.Length; i++)
                     {
-                        continue;
+                        if(queryInstance.Items[i].ActorInstanceID == actorID)
+                        {
+                            exists = true;
+                            break;
+                        }
                     }
-                }
 
-                // For actor items, we store the actor reference. 
-                // Note: We might want to avoid adding the same actor multiple times if multiple centers are used.
-                if (!items.Exists(it => it.Actor == actor))
-                {
-                    items.Add(new EnvQueryItem(numTests, actor.transform.position, actor));
+                    if (!exists)
+                    {
+                        queryInstance.AddItem(actor.transform.position, actor);
+                    }
                 }
             }
         }
-
-        return items;
     }
 }
