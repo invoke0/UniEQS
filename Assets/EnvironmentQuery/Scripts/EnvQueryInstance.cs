@@ -188,7 +188,7 @@ public class EnvQueryInstance : System.IDisposable
 
         isFinished = true;
         OnQueryFinished?.Invoke(this);
-        Dispose(); // Clean up native memory immediately upon completion? Or let Manager do it?
+        // Dispose(); // Let Manager or caller handle disposal to allow result reading
         // Better to let Manager do it or caller, but here we assume single-fire usage
         // Actually, if we dispose here, the results are gone. 
         // We should NOT dispose here if the user wants to read results.

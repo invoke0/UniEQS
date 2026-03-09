@@ -39,7 +39,7 @@ public class EnvQueryManager : MonoBehaviour
         return _nextQueryID++;
     }
 
-    public EnvQueryInstance CreateQueryInstance(EnvQueryTemplate template, EnvQueryRunMode runMode, GameObject owner)
+    public EnvQueryInstance CreateQueryInstance(EnvQuery template, EnvQueryRunMode runMode, GameObject owner)
     {
         // Direct creation, handling NativeList lifecycle internally
         var instance = new EnvQueryInstance(

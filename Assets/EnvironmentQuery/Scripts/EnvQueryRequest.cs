@@ -8,11 +8,11 @@ using UnityEngine;
  */
 public class EnvQueryRequest
 {
-    public EnvQueryTemplate QueryTemplate;
+    public EnvQuery QueryTemplate;
     public GameObject Owner;
     public Dictionary<string, float> NamedParams = new Dictionary<string, float>();
 
-    public EnvQueryRequest(EnvQueryTemplate template, GameObject owner)
+    public EnvQueryRequest(EnvQuery template, GameObject owner)
     {
         QueryTemplate = template;
         Owner = owner;

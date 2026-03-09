@@ -6,19 +6,19 @@ using UnityEngine.AI;
 public class NPCController : MonoBehaviour
 {
 	private NavMeshAgent agent;
-	private EnvQuery query;
+	private EQSTestingPawn query;
 
 	void Start()
 	{
 		agent = GetComponent<NavMeshAgent>();
-		query = GetComponent<EnvQuery>();
+		query = GetComponent<EQSTestingPawn>();
 	}
 
 	void Update()
 	{
-		if(query != null && query._instance != null && query.BestResult.IsValid)
+		if (query != null && query.bestItem.IsValid)
 		{
-			agent.SetDestination(query.BestResult.GetWorldPosition());
+			agent.SetDestination(query.bestItem.GetWorldPosition());
 		}
 	}
 }
