@@ -50,7 +50,7 @@ public abstract class EnvQueryTest : ScriptableObject
                     queryInstance.Items[i] = item; // Write back struct
                     continue;
                 }
-            }
+        }
 
             if (TestPurpose == EnvQueryTestPurpose.Filter) continue; // If only filtering, we are done with this item
 
