@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-3504845954551713029
+--- !u!114 &-7481365077827938312
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -9,17 +9,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d4871b264fdfff4da969dd9ea97abd7, type: 3}
-  m_Name: EnvQueryTestDistance
+  m_Script: {fileID: 11500000, guid: 7e6bd6d8ca7e08343a466ec43410d1da, type: 3}
+  m_Name: EnvQueryGeneratorOnCircle
   m_EditorClassIdentifier: 
-  TestPurpose: 2
-  FilterType: 2
-  FloatValueMin: 0
-  FloatValueMax: 100
-  BoolValue: 1
-  ScoringEquation: 0
-  ScoringFactor: 1
-  DistanceTo: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}
+  ProjectionData:
+    TraceMode: 1
+    ProjectDown: 10
+    ProjectUp: 10
+    GeometryLayer:
+      serializedVersion: 2
+      m_Bits: 4294967291
+  SearchCenter: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}
+  Radius: 5.13
+  SpaceBetween: 2
+  NumberOfPoints: 8
+  SpacingMethod: 1
+  TraceData:
+    TraceMode: 1
+    ProjectDown: 10
+    ProjectUp: 10
+    GeometryLayer:
+      serializedVersion: 2
+      m_Bits: 4294967291
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -34,10 +45,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   QueryName: 
   Options:
-  - Generator: {fileID: 1233706152733419035}
+  - Generator: {fileID: -7481365077827938312}
     Tests:
-    - {fileID: -3504845954551713029}
---- !u!114 &1233706152733419035
+    - {fileID: 0}
+    - {fileID: 3981563597101213640}
+--- !u!114 &3981563597101213640
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -46,18 +58,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2e73109616e8fcd49a82136d96186ffb, type: 3}
-  m_Name: EnvQueryGeneratorDonut
+  m_Script: {fileID: 11500000, guid: 4d4871b264fdfff4da969dd9ea97abd7, type: 3}
+  m_Name: EnvQueryTestDistance
   m_EditorClassIdentifier: 
-  ProjectionData:
-    TraceMode: 1
-    ProjectDown: 10
-    ProjectUp: 10
-    GeometryLayer:
-      serializedVersion: 2
-      m_Bits: 4294967291
-  SearchCenter: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}
-  InnerRadius: 2
-  OuterRadius: 6
-  NumberOfRings: 4
-  PointsPerRing: 63
+  TestPurpose: 1
+  FilterType: 2
+  FloatValueMin: 0
+  FloatValueMax: 100
+  BoolValue: 1
+  ScoringEquation: 0
+  ScoringFactor: 1
+  DistanceTo: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}

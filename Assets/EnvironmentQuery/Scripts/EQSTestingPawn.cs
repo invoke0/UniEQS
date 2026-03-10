@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -46,20 +46,50 @@ public class EQSTestingPawn : MonoBehaviour
                 }
             }
         }
-        else
+    }
+
+#if UNITY_EDITOR
+    private double _lastEditorUpdateTime;
+
+    private void OnEnable()
+    {
+        EditorApplication.update += EditorUpdate;
+    }
+
+    private void OnDisable()
+    {
+        EditorApplication.update -= EditorUpdate;
+    }
+
+    private void EditorUpdate()
+    {
+        if (Application.isPlaying) return;
+
+        if (AutoExecute && QueryTemplate != null)
         {
-            // In editor mode (not playing)
-            if (AutoExecute)
+            bool moved = Vector3.Distance(transform.position, _lastPosition) > 0.1f;
+            bool timeElapsed = (EditorApplication.timeSinceStartup - _lastEditorUpdateTime) > UpdateInterval;
+
+            if (moved || timeElapsed)
             {
-                // Only run when moved to save editor performance
-                if (Vector3.Distance(transform.position, _lastPosition) > 0.1f)
-                {
-                    ExecuteQueryEditor();
-                    _lastPosition = transform.position;
-                }
+                ExecuteQueryEditor();
+                _lastPosition = transform.position;
+                _lastEditorUpdateTime = EditorApplication.timeSinceStartup;
             }
         }
     }
+
+    private void OnValidate()
+    {
+        if (!Application.isPlaying && AutoExecute)
+        {
+            // Use delayCall to prevent Unity warnings about updating during validation
+            EditorApplication.delayCall += () => {
+                if (this != null) ExecuteQueryEditor();
+            };
+        }
+    }
+#endif
 
     [ContextMenu("Execute Query (Editor)")]
     public void ExecuteQueryEditor()
@@ -84,8 +114,11 @@ public class EQSTestingPawn : MonoBehaviour
         instance.Dispose();
         
 #if UNITY_EDITOR
-        // Repaint scene view to update gizmos immediately
-        SceneView.RepaintAll();
+        // Make sure the scene view reflects the new data
+        if (!Application.isPlaying)
+        {
+            SceneView.RepaintAll();
+        }
 #endif
     }
 

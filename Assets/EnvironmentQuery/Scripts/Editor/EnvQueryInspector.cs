@@ -82,7 +82,9 @@ public class EnvQueryInspector : Editor
         SerializedProperty generatorProp = optionProp.FindPropertyRelative("Generator");
         if (generatorProp.objectReferenceValue != null)
         {
-            Undo.DestroyObjectImmediate(generatorProp.objectReferenceValue);
+            UnityEngine.Object objToDestroy = generatorProp.objectReferenceValue;
+            generatorProp.objectReferenceValue = null;
+            UnityEngine.Object.DestroyImmediate(objToDestroy, true);
         }
 
         // Remove Tests
@@ -92,11 +94,14 @@ public class EnvQueryInspector : Editor
             SerializedProperty testProp = testsProp.GetArrayElementAtIndex(i);
             if (testProp.objectReferenceValue != null)
             {
-                Undo.DestroyObjectImmediate(testProp.objectReferenceValue);
+                UnityEngine.Object objToDestroy = testProp.objectReferenceValue;
+                testProp.objectReferenceValue = null;
+                UnityEngine.Object.DestroyImmediate(objToDestroy, true);
             }
         }
 
         optionsProp.DeleteArrayElementAtIndex(index);
+        serializedObject.ApplyModifiedProperties();
         AssetDatabase.SaveAssets();
     }
 
@@ -174,9 +179,11 @@ public class EnvQueryInspector : Editor
     {
         if (generatorProp.objectReferenceValue != null)
         {
-            Undo.DestroyObjectImmediate(generatorProp.objectReferenceValue);
+            UnityEngine.Object objToDestroy = generatorProp.objectReferenceValue;
             generatorProp.objectReferenceValue = null;
             generatorProp.serializedObject.ApplyModifiedProperties();
+            
+            UnityEngine.Object.DestroyImmediate(objToDestroy, true);
             AssetDatabase.SaveAssets();
         }
     }
@@ -263,12 +270,15 @@ public class EnvQueryInspector : Editor
             SerializedProperty element = testsProp.GetArrayElementAtIndex(l.index);
             if (element.objectReferenceValue != null)
             {
-                Undo.DestroyObjectImmediate(element.objectReferenceValue);
-                // Also need to remove the array element reference
-                // But ReorderableList.defaultBehaviours.DoRemoveButton(l) handles array removal.
-                // However, we destroyed the object, so the reference is now null/missing.
+                UnityEngine.Object objToDestroy = element.objectReferenceValue;
+                element.objectReferenceValue = null;
+                UnityEngine.Object.DestroyImmediate(objToDestroy, true);
             }
+            
+            // ReorderableList.defaultBehaviours.DoRemoveButton removes the array element, 
+            // but if we cleared the reference, it just deletes the empty slot.
             ReorderableList.defaultBehaviours.DoRemoveButton(l);
+            testsProp.serializedObject.ApplyModifiedProperties();
             AssetDatabase.SaveAssets();
         };
 
