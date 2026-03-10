@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Collections;
 
-public class EnvQueryGeneratorDonut : EnvQueryGenerator
+public class EnvQueryGeneratorDonut : EnvQueryGenerator_ProjectedPoints
 {
     public EnvQueryContext SearchCenter;
     public float InnerRadius = 2.0f;
@@ -13,6 +13,7 @@ public class EnvQueryGeneratorDonut : EnvQueryGenerator
     public override void GenerateItems(EnvQueryInstance queryInstance)
     {
         if (!queryInstance.PrepareContext(SearchCenter, out List<Vector3> centerPoints)) return;
+        List<Vector3> rawPoints = new List<Vector3>();
         
         float radiusStep = (OuterRadius - InnerRadius) / Mathf.Max(1, NumberOfRings - 1);
         float angleDelta = 2 * Mathf.PI / PointsPerRing;
@@ -30,9 +31,11 @@ public class EnvQueryGeneratorDonut : EnvQueryGenerator
                         0,
                         currentRadius * Mathf.Sin(angle)
                     );
-                    queryInstance.AddItem(centerPos + offset);
+                    rawPoints.Add(centerPos + offset);
                 }
             }
         }
+        
+        ProjectAndFilterPoints(rawPoints, queryInstance);
     }
 }

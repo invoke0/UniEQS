@@ -55,6 +55,30 @@ public enum EnvQueryStatus
     MissingTemplate
 }
 
+public enum EnvQueryTrace
+{
+    None,
+    Navigation,
+    Geometry
+}
+
+[System.Serializable]
+public struct EnvTraceData
+{
+    public EnvQueryTrace TraceMode;
+    public float ProjectDown;
+    public float ProjectUp;
+    public LayerMask GeometryLayer;
+
+    public EnvTraceData(EnvQueryTrace mode = EnvQueryTrace.None)
+    {
+        TraceMode = mode;
+        ProjectDown = 10.0f;
+        ProjectUp = 10.0f;
+        GeometryLayer = Physics.DefaultRaycastLayers;
+    }
+}
+
 public delegate void QueryFinishedSignature(EnvQueryInstance queryInstance);
 
 public static class EnvQueryTypes

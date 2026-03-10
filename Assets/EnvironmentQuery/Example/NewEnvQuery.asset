@@ -20,21 +20,6 @@ MonoBehaviour:
   ScoringEquation: 0
   ScoringFactor: 1
   DistanceTo: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}
---- !u!114 &-1626617840489468961
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7e6bd6d8ca7e08343a466ec43410d1da, type: 3}
-  m_Name: EnvQueryGeneratorOnCircle
-  m_EditorClassIdentifier: 
-  SearchCenter: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}
-  Radius: 10
-  SpaceBetween: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -49,6 +34,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   QueryName: 
   Options:
-  - Generator: {fileID: -1626617840489468961}
+  - Generator: {fileID: 1233706152733419035}
     Tests:
     - {fileID: -3504845954551713029}
+--- !u!114 &1233706152733419035
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e73109616e8fcd49a82136d96186ffb, type: 3}
+  m_Name: EnvQueryGeneratorDonut
+  m_EditorClassIdentifier: 
+  ProjectionData:
+    TraceMode: 1
+    ProjectDown: 10
+    ProjectUp: 10
+    GeometryLayer:
+      serializedVersion: 2
+      m_Bits: 4294967291
+  SearchCenter: {fileID: 11400000, guid: 50affbb5bc0f96d42915557e297bc353, type: 2}
+  InnerRadius: 2
+  OuterRadius: 6
+  NumberOfRings: 4
+  PointsPerRing: 63
